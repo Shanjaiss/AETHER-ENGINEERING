@@ -54,9 +54,33 @@ def get_db() -> Generator[Session, None, None]:
         db.close()
 
 def init_db() -> None:
-    """Create all tables if they don't exist."""
+    """Create all tables if they don't exist and run safe incremental migrations."""
     from backend.app.models import base, workspace, task, user, audit  # noqa
     Base.metadata.create_all(bind=engine)
+    
+    # Incremental column synchronization for SQLite
+    if engine.dialect.name == "sqlite":
+        with engine.connect() as conn:
+            try:
+                # Workspaces
+                result = conn.execute(text("PRAGMA table_info(workspaces)"))
+                ws_cols = [row[1] for row in result.fetchall()]
+                if ws_cols and "tenant_id" not in ws_cols:
+                    conn.execute(text("ALTER TABLE workspaces ADD COLUMN tenant_id VARCHAR DEFAULT 'default-tenant'"))
+                if ws_cols and "owner_id" not in ws_cols:
+                    conn.execute(text("ALTER TABLE workspaces ADD COLUMN owner_id VARCHAR"))
+
+                # Tasks
+                result = conn.execute(text("PRAGMA table_info(tasks)"))
+                task_cols = [row[1] for row in result.fetchall()]
+                if task_cols and "tenant_id" not in task_cols:
+                    conn.execute(text("ALTER TABLE tasks ADD COLUMN tenant_id VARCHAR DEFAULT 'default-tenant'"))
+                if task_cols and "created_by_user_id" not in task_cols:
+                    conn.execute(text("ALTER TABLE tasks ADD COLUMN created_by_user_id VARCHAR"))
+
+                conn.commit()
+            except Exception:
+                pass
 
 def check_db_readiness() -> Tuple[bool, str, Dict[str, Any]]:
     """Verifies database connectivity, latency, and connection pool status."""

@@ -13,7 +13,7 @@ class Settings(BaseSettings):
     )
 
     APP_NAME: str = "AETHER ENGINEER"
-    APP_VERSION: str = "0.1.0"
+    APP_VERSION: str = "1.0.0-rc.1"
     APP_ENV: str = "development"
     DEBUG: bool = True
     HOST: str = "127.0.0.1"

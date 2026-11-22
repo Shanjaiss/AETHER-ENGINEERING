@@ -212,15 +212,19 @@ docker compose --profile production up -d
 
 ## 9. Documentation Index
 
+- [Release Notes v1.0.0-rc.1](file:///Users/shanjaisenthil/Documents/AETHER%20ENGINEER/RELEASE_NOTES.md)
+- [Phase 14 Final System Verification & Release Report](file:///Users/shanjaisenthil/Documents/AETHER%20ENGINEER/docs/PHASE_14_COMPLETION_REPORT.md)
 - [Production Infrastructure & DevOps Architecture](file:///Users/shanjaisenthil/Documents/AETHER%20ENGINEER/docs/INFRASTRUCTURE.md)
 - [3-Tier Cloud Deployment Architecture](file:///Users/shanjaisenthil/Documents/AETHER%20ENGINEER/docs/CLOUD_DEPLOYMENT.md)
 - [Disaster Recovery & Incident Response Runbook](file:///Users/shanjaisenthil/Documents/AETHER%20ENGINEER/docs/DISASTER_RECOVERY.md)
-- [System Architecture & 10 ADRs](file:///Users/shanjaisenthil/Documents/AETHER%20ENGINEER/docs/ARCHITECTURE.md)
+- [System Architecture & 12 ADRs](file:///Users/shanjaisenthil/Documents/AETHER%20ENGINEER/docs/ARCHITECTURE.md)
 - [Complete OpenAPI Reference](file:///Users/shanjaisenthil/Documents/AETHER%20ENGINEER/docs/API_REFERENCE.md)
 - [Benchmark Results & Research Report](file:///Users/shanjaisenthil/Documents/AETHER%20ENGINEER/docs/BENCHMARK_SUMMARY.md)
 - [Real-World Engineering Case Studies](file:///Users/shanjaisenthil/Documents/AETHER%20ENGINEER/docs/CASE_STUDIES.md)
-- [Technical Interview Preparation Guide (80 Questions)](file:///Users/shanjaisenthil/Documents/AETHER%20ENGINEER/docs/INTERVIEW_PREPARATION_GUIDE.md)
-- [Career Materials & ATS Resume Bullets](file:///Users/shanjaisenthil/Documents/AETHER%20ENGINEER/docs/CAREER_AND_RESUME_GUIDE.md)
+- [Professional Demo Video Scripts (5m, 2m, 60s, 30s)](file:///Users/shanjaisenthil/Documents/AETHER%20ENGINEER/docs/DEMO_VIDEO_SCRIPT.md)
+- [Portfolio Screenshot Catalog & Visual Asset Guide](file:///Users/shanjaisenthil/Documents/AETHER%20ENGINEER/docs/assets/README.md)
+- [Technical Interview Preparation Guide (105 Questions)](file:///Users/shanjaisenthil/Documents/AETHER%20ENGINEER/docs/INTERVIEW_PREPARATION_GUIDE.md)
+- [Career Materials & ATS Resume Bullets (7 Roles)](file:///Users/shanjaisenthil/Documents/AETHER%20ENGINEER/docs/CAREER_AND_RESUME_GUIDE.md)
 
 ---
 

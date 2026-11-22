@@ -62,6 +62,8 @@ coverage/
 
 # Workspaces & Scratch Execution
 workspaces/isolated/
+workspaces/recruiter_demos/
+workspaces/task_memory/
 scratch/
 temp/
 

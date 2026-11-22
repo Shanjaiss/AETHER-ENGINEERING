@@ -21,10 +21,46 @@ import {
   AblationStudyReport,
   ModelComparisonReport,
   SecurityBenchmarkReport,
-  SWEBenchStatus
+  SWEBenchStatus,
+  UserResponse,
+  TokenResponse,
+  AuditLogItem
 } from '../types';
 
 const API_BASE = '/api/v1';
+
+export function getAuthToken(): string | null {
+  try {
+    return localStorage.getItem('aether_token');
+  } catch {
+    return null;
+  }
+}
+
+export function setAuthToken(token: string): void {
+  try {
+    localStorage.setItem('aether_token', token);
+  } catch {
+    // ignore
+  }
+}
+
+export function clearAuthToken(): void {
+  try {
+    localStorage.removeItem('aether_token');
+  } catch {
+    // ignore
+  }
+}
+
+function getAuthHeaders(extraHeaders: Record<string, string> = {}): Record<string, string> {
+  const headers: Record<string, string> = { ...extraHeaders };
+  const token = getAuthToken();
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+  return headers;
+}
 
 async function handleResponse<T>(response: Response): Promise<T> {
   if (!response.ok) {
@@ -344,5 +380,42 @@ export const api = {
       body: JSON.stringify(data),
     });
     return handleResponse<SettingsResponse>(res);
+  },
+
+  // Authentication & RBAC
+  async register(data: { email: string; password: string; full_name?: string; role?: string; tenant_id?: string }): Promise<UserResponse> {
+    const res = await fetch(`${API_BASE}/auth/register`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    });
+    return handleResponse<UserResponse>(res);
+  },
+
+  async login(data: { email: string; password: string }): Promise<TokenResponse> {
+    const res = await fetch(`${API_BASE}/auth/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    });
+    const tokens = await handleResponse<TokenResponse>(res);
+    if (tokens && tokens.access_token) {
+      setAuthToken(tokens.access_token);
+    }
+    return tokens;
+  },
+
+  async getCurrentUser(): Promise<UserResponse> {
+    const res = await fetch(`${API_BASE}/auth/me`, {
+      headers: getAuthHeaders(),
+    });
+    return handleResponse<UserResponse>(res);
+  },
+
+  async getAuditLogs(limit: number = 50): Promise<AuditLogItem[]> {
+    const res = await fetch(`${API_BASE}/auth/audit-logs?limit=${limit}`, {
+      headers: getAuthHeaders(),
+    });
+    return handleResponse<AuditLogItem[]>(res);
   },
 };

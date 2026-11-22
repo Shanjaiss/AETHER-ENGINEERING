@@ -280,16 +280,41 @@ stateDiagram-v2
 - **Decision:** The benchmark harness separates repository files from acceptance test files. Acceptance tests are stored outside the agent's context and executed independently by the `IndependentEvaluationEngine`.
 - **Consequences:** Scientifically valid evaluation, zero test leakage, verifiable ground-truth metrics.
 
+### ADR-011: Multi-Stage Containerization & Compose Profiles for Local-to-Cloud Portability
+- **Status:** Accepted
+- **Context:** Running heavy containers on an 8 GB Mac M1 causes memory exhaustion, yet production deployment requires hardened container images and reverse proxies.
+- **Decision:** Implement multi-stage Dockerfiles with unprivileged non-root users (`aether` uid 10001, Nginx non-root). In `docker-compose.yml`, define five modular profiles (`development`, `data`, `worker`, `observability`, `production`). Native Mac M1 execution uses SQLite WAL mode without Docker daemons, while staging and cloud environments spin up isolated containers.
+- **Consequences:** Instant local startup, zero background daemon RAM overhead, seamless containerized cloud deployment.
+
+### ADR-012: Server-Sent Events (SSE) for Real-Time Execution Streaming
+- **Status:** Accepted
+- **Context:** Autonomous agent executions generate progressive step logs, test outputs, and state transitions that must reach the frontend without high-overhead polling.
+- **Decision:** Use HTTP/1.1 and HTTP/2 Server-Sent Events (SSE) via `/api/v1/events/stream/{task_id}` with 15-second keepalive heartbeats and `Last-Event-ID` connection recovery, rather than full-duplex WebSockets.
+- **Consequences:** Unidirectional streaming over standard HTTP, compatibility with corporate firewalls and reverse proxies, automatic browser reconnects, and zero socket handshake overhead.
+
 ---
 
-## 7. Security Architecture & Threat Model
+## 7. Security Architecture & Threat Model (20 Audited Attack Vectors)
 
 | Threat Vector | Mitigation Strategy | Architectural Enforcement |
 |---|---|---|
-| **Directory Traversal** | Reject paths escaping workspace root | `validate_safe_path()` checks `resolved_path.parents` against allowlist |
-| **Symlink Escapes** | Forbid resolving outside roots | `target_path.resolve()` resolves realpath and checks containment |
-| **Command Injection** | Prevent arbitrary shell commands | `sanitize_command()` parses args as vector; `shell=False` always enforced |
-| **Secret Exfiltration** | Strip sensitive tokens | `SecretRedactor` regex scrubs API keys from stdout, logs, and prompt contexts |
-| **Prompt Injection** | Detect override keywords | `HIGH_RISK_KEYWORDS` scanner flags prompt overrides and escalates to `CRITICAL` risk |
-| **Host Overwrite** | Prevent unapproved merges | Dual approval gates; file hashes verified prior to final merge |
-| **Resource Exhaustion** | Prevent runaway execution | 60s test timeouts; max 3 repair attempts; sub-100 MB memory profiling |
+| **1. Directory Traversal** | Reject paths escaping workspace root | `validate_safe_path()` checks `resolved_path.parents` against allowlist |
+| **2. Encoded Directory Traversal** | Block URL/Unicode encoded dots (`%2e%2e%2f`) | Canonical path resolution via `pathlib.Path.resolve()` before checks |
+| **3. Symlink Escapes** | Forbid resolving outside roots | `target_path.resolve()` resolves realpath and verifies containment |
+| **4. Sensitive File Tampering** | Protect credentials, keys, and git internals | Write operations to `.env`, `.pem`, `.key`, `id_rsa`, `.git/` blocked |
+| **5. Secret Exfiltration** | Strip sensitive tokens | `SecretRedactor` regex scrubs API keys from stdout, logs, and prompt contexts |
+| **6. Prompt Injection** | Detect override keywords in comments & code | `HIGH_RISK_KEYWORDS` scanner flags prompt overrides and escalates to `CRITICAL` risk |
+| **7. Command Injection** | Prevent arbitrary shell metacharacters | `sanitize_command()` parses args as vector; `shell=False` always enforced |
+| **8. Arbitrary Subprocess Exec** | Restrict execution to trusted dev tools | Subprocess execution restricted strictly to `pytest`, `vitest`, `npm`, `python`, `node`, `tsc` |
+| **9. Runaway Execution** | Prevent infinite test runner hangs | Hard 60-second timeouts enforced via `proc.wait(timeout=timeout)` |
+| **10. Infinite Repair Loops** | Limit autonomous recursion | Strict bounded repair loop halting execution at `MAX_REPAIR_ATTEMPTS = 3` |
+| **11. Untrusted Host Execution** | Isolate untrusted code modifications | All edits and builds executed in disposable sandboxes (`workspaces/isolated/`) |
+| **12. Concurrent Patch Collision** | Prevent simultaneous dirty writes | State machine transition locks and atomic file hashing before apply |
+| **13. Scope Creep Drift** | Detect unrequested file edits | Proposed files compared against repository scan boundaries; excess files rejected |
+| **14. Plan Cyclic Deadlocks** | Detect circular step dependencies | Kahn's algorithm topological sorting with cycle detection |
+| **15. Unauthenticated Access** | Enforce identity verification | PBKDF2-HMAC-SHA256 password hashing and signed HS256 JWT tokens |
+| **16. Horizontal Privilege Escalation**| Enforce tenant boundaries | `verify_workspace_access()` checks `tenant_id` and `owner_id` on all workspace requests |
+| **17. JWT Tampering** | Validate cryptographic signatures | Constant-time HMAC-SHA256 signature verification with secret key |
+| **18. Token Replay / Expiration** | Reject expired or invalid claims | Strict UTC timestamp checking on `exp`, `iss`, and `aud` claims |
+| **19. Vertical Privilege Escalation**| Restrict administrative endpoints | Role-Based Access Control (`require_role(UserRole.ADMIN)`) |
+| **20. XSS / Output Poisoning** | Sanitize diffs and AST symbol strings | React DOM text escaping and sanitized unidiff rendering |

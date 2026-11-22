@@ -407,4 +407,119 @@
 **Answer:**
 > *"The control plane (FastAPI, database, auth) handles user interactions and planning. Untrusted repository code (unit tests, scripts) is never executed within the primary application process. It executes inside dedicated subprocess sandboxes with stripped environments, strict argument allowlists, and execution timeouts. In cloud production, this boundary is enforced via isolated microVMs, ensuring untrusted code has zero access to host credentials or internal network services."*
 
+---
+
+# SECTION K: BENCHMARKS, SWE-BENCH & SCIENTIFIC EVALUATION
+
+#### Q81: What is the primary methodology behind the 50-task custom engineering benchmark suite?
+**Answer:**
+> *"The 50 tasks span 10 engineering domains (API routing, data parsing, state machines, math utils, auth, pagination, debounce hooks, error boundaries, database relations, and caching) across Python, TypeScript, and JavaScript. Each task includes a failing regression test fixture, ground-truth acceptance criteria, and independent held-out evaluation tests that verify functional correctness, zero regressions, and code cleanliness without test leakage."*
+
+#### Q82: How does AETHER ENGINEER prevent benchmark test leakage / data contamination?
+**Answer:**
+> *"Test leakage occurs when the agent is fed the acceptance test suite in its prompt, enabling it to 'overfit' or hardcode assertions. AETHER ENGINEER strictly separates developer-visible regression tests from held-out evaluator tests. The agent is only provided with the initial bug description or requirement; the independent evaluation harness executes hidden acceptance tests in a separate sandbox post-generation."*
+
+#### Q83: How does the SWE-bench Lite adapter function and what are its hardware requirements?
+**Answer:**
+> *"SWE-bench Lite evaluates agents against real GitHub pull requests and issues from large open-source repositories (such as `psf/requests`, `sympy/sympy`, `django/django`). Full SWE-bench evaluation requires Docker and 16–32 GB RAM per instance. On memory-constrained Apple Silicon Mac M1 (8 GB RAM), our adapter performs environment pre-flight checks: if Docker is unavailable, it runs verified offline golden fixtures (e.g., `psf__requests-2317`) and generates official predictions in standard SWE-bench JSONL format without exhausting host RAM."*
+
+#### Q84: What were the key findings of the 6-configuration ablation study?
+**Answer:**
+> *"The ablation study systematically disabled individual pipeline components across 10 representative tasks:
+> 1. Full Pipeline (AST + Classification + DAG + Verification): 100% resolution (10/10).
+> 2. No AST Intelligence (pure file search): Resolution dropped to 60% due to missing cross-file symbol call sites.
+> 3. No Task Understanding (raw prompt): Resolution dropped to 50% due to lack of structured acceptance criteria.
+> 4. No DAG Planning (single-shot prompt): Resolution dropped to 40% on multi-file dependencies.
+> 5. No Test Verification (blind generation): Resolution dropped to 20% due to unnoticed syntax and import errors.
+> This proved that deterministic verification and AST intelligence contribute over 60% of autonomous engineering success."*
+
+#### Q85: How does AETHER ENGINEER compare LLM performance across models objectively?
+**Answer:**
+> *"Our Model Comparison Framework evaluates candidate models (e.g. Gemini 1.5 Pro, Claude 3.5 Sonnet, GPT-4o, Ollama Qwen2.5-Coder) across identical benchmark fixtures measuring four dimensions: 1) Pass rate percentage (% resolved), 2) First-attempt pass rate (% without repair iterations), 3) Token consumption (prompt + completion), and 4) Cost per task ($ USD). This provides empirical data for architectural model selection."*
+
+#### Q86: What is the purpose of the 12-task Adversarial Security Benchmark?
+**Answer:**
+> *"The adversarial benchmark tests the platform's defenses against real attack vectors: directory traversal variations (`../../etc/passwd`, `%2e%2e%2f`), symlink escapes, environment secret access attempts, prompt injection directives in code comments, dangerous shell metacharacters (`; rm -rf`, `&& curl`), and unauthorized file overrides. AETHER ENGINEER achieved a 100% prevention rate (12/12 blocked)."*
+
+#### Q87: How are benchmark results persisted and exported for peer review?
+**Answer:**
+> *"Benchmark runs are stored in the SQLite/PostgreSQL `benchmark_runs` table with timestamps, task IDs, pass/fail status, iteration counts, latency in milliseconds, and peak memory. Results can be exported via `/api/v1/benchmarks/export?format=json` or `format=csv`, producing reproducible artifacts for scientific documentation."*
+
+#### Q88: Why is pass@1 an insufficient metric for autonomous software engineering?
+**Answer:**
+> *"Pass@1 measures whether the LLM's first unverified completion happens to be correct. In real software engineering, first drafts frequently have minor import typos, typing errors, or missed edge cases. Measuring pass^k with bounded verification and self-debugging (e.g., up to 3 repair passes) reflects real-world engineering workflows where tests guide code refinement."*
+
+#### Q89: How does AETHER ENGINEER calculate first-attempt success rate vs total resolution rate?
+**Answer:**
+> *"First-attempt success rate is the percentage of tasks resolved where `repair_attempts == 0` (i.e., the initial generated patch passed verification tests on the first execution). Total resolution rate includes tasks resolved after 1, 2, or 3 bounded repair loops. In our benchmark, first-attempt success was 84.0%, and total resolution reached 100.0%."*
+
+#### Q90: How are regression tests generated to guarantee the bug actually existed?
+**Answer:**
+> *"A valid regression test must fail before the fix is applied and pass after the fix is applied. If a test passes before any code change, it is an invalid test that doesn't reproduce the reported issue. AETHER ENGINEER runs a baseline verification step (Step 2 in our workflow) to prove test failure before generating any implementation patch."*
+
+---
+
+# SECTION L: MAC M1 RESOURCE OPTIMIZATION, PERFORMANCE ENGINEERING & SYSTEM VERIFICATION
+
+#### Q91: How was AETHER ENGINEER optimized to run efficiently on an Apple Silicon Mac M1 with 8 GB RAM?
+**Answer:**
+> *"By eliminating heavyweight background processes: 1) We replaced vector database daemons (which consume 400–800 MB RAM) with native Python AST symbol parsing and lexical indexing, 2) We used SQLite with WAL mode rather than requiring a dedicated PostgreSQL daemon for local development, 3) We executed code in lightweight subprocesses rather than running full virtualization, and 4) We implemented strict memory recycling in FastAPI lifespans, keeping peak resident memory under 68 MB RSS."*
+
+#### Q92: What is Resident Set Size (RSS) and how was it measured during system profiling?
+**Answer:**
+> *"RSS is the portion of memory occupied by a process in RAM (excluding swapped pages). We measure it using `psutil.Process().memory_info().rss`. In `scripts/profile_system.py`, we sample baseline RSS upon startup, track peak RSS during full repository scans and multi-table database queries, and assert that peak RSS stays well below the 150 MB Mac M1 budget."*
+
+#### Q93: Why is SQLite in WAL (Write-Ahead Logging) mode optimal for local development?
+**Answer:**
+> *"In default rollback journal mode, readers block writers and writers block readers. In WAL mode (`PRAGMA journal_mode=WAL`), writers append changes to a separate `-wal` file while readers query the main database concurrently without locking. This allows seamless multi-threaded read concurrency, sub-millisecond query latency, and zero background daemon overhead."*
+
+#### Q94: How does AETHER ENGINEER achieve sub-2ms database query latency?
+**Answer:**
+> *"1) Strategic indexing on frequently queried columns (`tenant_id`, `workspace_id`, `created_at`, `status`), 2) Connection pooling with `pool_pre_ping=True` to avoid connection setup overhead, 3) Selecting only required columns rather than performing eager Cartesian joins, and 4) In-memory query caching for static metadata."*
+
+#### Q95: What were the empirical results of the load test in Phase 13?
+**Answer:**
+> *"Using `scripts/load_test.py`, we executed 1,000 requests with concurrency of 20 against `/api/v1/health`. The system achieved 486.8 requests per second, median latency (p50) of 1.51 ms, p95 latency of 3.42 ms, p99 latency of 5.88 ms, and a 0.0% error rate."*
+
+#### Q96: How does the AST symbol parser scan 280+ files in under 60 milliseconds?
+**Answer:**
+> *"1) Filtering directories early using `.gitignore` patterns and directory skip rules (skipping `node_modules`, `.venv`, `.git`), 2) Utilizing Python's built-in `ast.parse` which is implemented in optimized C, 3) Extracting only top-level class, function, and import definitions without walking deep statement trees unless requested, and 4) ThreadPool parallelization across multi-core Apple Silicon CPU cores."*
+
+#### Q97: How does AETHER ENGINEER prevent memory leaks in long-running worker processes?
+**Answer:**
+> *"1) Explicit session closure in database context managers (`try: yield db finally: db.close()`), 2) Subprocess sandboxes are spawned and terminated cleanly rather than running continuously in memory, 3) Garbage collection hooks (`gc.collect()`) after large benchmark batches, and 4) Limiting in-memory task queues to bounded maximum lengths."*
+
+#### Q98: How does the system handle rapid cancellation of in-flight tasks?
+**Answer:**
+> *"Tasks check cancellation flags (`task.status == TaskStatus.CANCELLED`) at state machine step transitions. If a task is cancelled while a test subprocess is executing, the worker terminates the child process group via `os.killpg(proc.pid, signal.SIGTERM)`, waits up to 2 seconds, and escalates to `SIGKILL` if unresponsive, preventing orphaned processes from consuming CPU."*
+
+#### Q99: Why did we choose Server-Sent Events (SSE) over WebSockets for task progress streaming?
+**Answer:**
+> *"1) SSE operates over standard HTTP/1.1 and HTTP/2, requiring no custom handshake protocols or protocol upgrades, 2) It works through corporate proxies and firewalls without connection drops, 3) It has built-in client reconnection support via the browser's native `EventSource` API and `Last-Event-ID` header, and 4) AETHER ENGINEER task updates are unidirectional (server to client), making full-duplex WebSockets unnecessary complexity."*
+
+#### Q100: How is the frontend bundle optimized to under 320 kB?
+**Answer:**
+> *"1) Tree-shaking unused Lucide icons using modern ES module imports, 2) Dynamic code splitting with Vite and React lazy loading, 3) Tailwind CSS purging that strips unused utility classes in production build, and 4) Minification via esbuild, resulting in 84.8 kB gzipped JavaScript."*
+
+#### Q101: What constitutes a production-ready Release Candidate (v1.0.0-rc.1)?
+**Answer:**
+> *"A Release Candidate must meet strict verification criteria: 1) 100% of automated unit and integration tests passing, 2) Zero open P0 or P1 defects, 3) Complete security regression suite passing with zero vulnerabilities, 4) Documented API references and architecture decision records, 5) Automated deployment scripts with environment variable templates, and 6) Measurable benchmarks proving reliability."*
+
+#### Q102: How does AETHER ENGINEER verify that a patch can be cleanly reversed if needed?
+**Answer:**
+> *"The Review Engine generates reversible unidiff patches. Because the patch includes file hashes and exact line offsets, running `patch -R -p1 < patch.diff` or invoking `review_engine.rollback()` restores the original source files byte-for-byte, verifying atomic rollback capabilities."*
+
+#### Q103: What trade-offs were made between Dockerized execution and native local execution?
+**Answer:**
+> *"Dockerized execution provides complete OS-level isolation and dependency reproducibility across Linux environments, making it ideal for CI/CD and multi-tenant cloud hosting. However, on an Apple Silicon Mac M1 with 8 GB RAM, running the Docker Desktop VM consumes 2–3 GB of memory. Native local execution using process sandboxes and SQLite WAL provides sub-70 MB RSS and instant execution, allowing seamless development without container overhead."*
+
+#### Q104: How do you explain the difference between a chat-based AI tool and an autonomous engineering platform?
+**Answer:**
+> *"A chat tool is an advisory assistant: it generates text snippets based on user queries, leaving testing, debugging, integration, security auditing, and verification entirely to the human. An autonomous engineering platform is an active execution harness: it accepts an engineering objective, analyzes repository ASTs, constructs a dependency plan, executes changes in a sandboxed clone, runs verification test suites, self-debugs failures, and only presents verified diffs for human approval."*
+
+#### Q105: What is the single most important lesson learned building AETHER ENGINEER?
+**Answer:**
+> *"Autonomous AI is only as reliable as the deterministic verification harness surrounding it. LLMs are non-deterministic pattern generators; without strict AST context retrieval, topological DAG constraints, sandboxed execution, and real test execution with bounded repair loops, autonomous agents cannot be trusted with production code. Rigorous systems engineering is the foundation that makes agentic AI viable."*
+
+
 

@@ -439,3 +439,32 @@ export interface DynamicPlanOutput {
   expected_limitations: string[];
   revision_count: number;
 }
+
+export interface UserResponse {
+  id: string;
+  email: string;
+  full_name?: string;
+  role: 'ADMIN' | 'DEVELOPER' | 'VIEWER';
+  tenant_id: string;
+  is_active: boolean;
+  created_at: string;
+}
+
+export interface TokenResponse {
+  access_token: string;
+  refresh_token: string;
+  token_type: string;
+  expires_in: number;
+  user: UserResponse;
+}
+
+export interface AuditLogItem {
+  id: string;
+  timestamp: string;
+  user_id?: string;
+  tenant_id: string;
+  event_type: string;
+  ip_address?: string;
+  status: string;
+  details: Record<string, any>;
+}
