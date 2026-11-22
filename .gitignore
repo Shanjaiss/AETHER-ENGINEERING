@@ -1,0 +1,74 @@
+# Git ignore for AETHER ENGINEER
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Virtual environments
+.venv/
+venv/
+ENV/
+env/
+
+# Node / Frontend
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+frontend/dist/
+frontend/dist-ssr/
+*.local
+
+# Testing and coverage
+.cache
+.pytest_cache/
+.coverage
+htmlcov/
+.vitest_cache/
+coverage/
+
+# Database
+*.db
+*.sqlite
+*.sqlite3
+
+# Environment and secrets (CRITICAL)
+.env
+.env.*.local
+*.pem
+*.key
+*.cert
+
+# Workspaces & Scratch Execution
+workspaces/isolated/
+scratch/
+temp/
+
+# IDE / OS
+.DS_Store
+.idea/
+.vscode/
+*.swp
+*.swo
+
