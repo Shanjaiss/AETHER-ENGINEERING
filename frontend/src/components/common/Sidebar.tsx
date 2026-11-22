@@ -1,6 +1,7 @@
 import React from 'react';
 import {
   LayoutDashboard,
+  Code2,
   FolderGit2,
   FileCode2,
   Terminal,
@@ -9,18 +10,21 @@ import {
   FlaskConical,
   BarChart3,
   Settings,
-  Cpu
+  Cpu,
+  HelpCircle
 } from 'lucide-react';
 
 interface SidebarProps {
   currentTab: string;
   onSelectTab: (tab: string) => void;
   activeWorkspaceName?: string;
+  onOpenTour?: () => void;
 }
 
-export const Sidebar: React.FC<SidebarProps> = ({ currentTab, onSelectTab, activeWorkspaceName }) => {
+export const Sidebar: React.FC<SidebarProps> = ({ currentTab, onSelectTab, activeWorkspaceName, onOpenTour }) => {
   const navItems = [
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
+    { id: 'workspace-ide', label: 'Engineering IDE', icon: Code2 },
     { id: 'workspaces', label: 'Workspaces', icon: FolderGit2 },
     { id: 'repo-explorer', label: 'Repo Explorer', icon: FileCode2 },
     { id: 'task-console', label: 'AI Task Console', icon: Terminal },
@@ -78,6 +82,19 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentTab, onSelectTab, activ
           );
         })}
       </nav>
+
+      {/* Interactive Tour CTA */}
+      {onOpenTour && (
+        <div className="px-3 py-2 border-t border-navy-800/60">
+          <button
+            onClick={onOpenTour}
+            className="w-full flex items-center justify-center space-x-2 px-3 py-2 rounded-lg bg-navy-800 hover:bg-navy-700/80 border border-cyan-500/20 text-cyan-300 text-xs font-medium transition-colors"
+          >
+            <HelpCircle className="w-3.5 h-3.5 text-cyan-400" />
+            <span>Product Tour</span>
+          </button>
+        </div>
+      )}
 
       {/* Footer Info */}
       <div className="p-3 border-t border-navy-800 text-[11px] font-mono text-slate-400 flex items-center justify-between">

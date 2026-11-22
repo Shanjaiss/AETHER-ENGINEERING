@@ -1,0 +1,25 @@
+{
+  "task_id": "87f82380-4b5c-4649-b9b0-2a7f9ba18195",
+  "user_requirement": "",
+  "relevant_files": [],
+  "relevant_symbols": [],
+  "verified_facts": [
+    {
+      "statement": "Repository 'specialized_agent_ws' indexed with 2 files, 1 dependency edges.",
+      "verified_source": "EMPIRICAL_CHECK",
+      "recorded_at": "2026-11-22T05:29:36.119330+00:00"
+    },
+    {
+      "statement": "Plan generated with 3 steps and risk MEDIUM",
+      "verified_source": "EMPIRICAL_CHECK",
+      "recorded_at": "2026-11-22T05:29:36.121643+00:00"
+    }
+  ],
+  "model_hypotheses": [],
+  "tool_executions": [],
+  "implemented_patches": [],
+  "repair_history": [],
+  "attempted_command_hashes": [],
+  "attempted_patch_hashes": [],
+  "last_checkpoint_at": "2026-11-22T05:29:36.121647+00:00"
+}

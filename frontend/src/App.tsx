@@ -4,8 +4,10 @@ import { api } from './services/api';
 import { Workspace, Task } from './types';
 import { Sidebar } from './components/common/Sidebar';
 import { Header } from './components/common/Header';
+import { OnboardingModal } from './components/common/OnboardingModal';
 
 import { Dashboard } from './pages/Dashboard';
+import { EngineeringWorkspacePage } from './pages/EngineeringWorkspacePage';
 import { WorkspacesPage } from './pages/WorkspacesPage';
 import { RepoExplorerPage } from './pages/RepoExplorerPage';
 import { TaskConsolePage } from './pages/TaskConsolePage';
@@ -18,6 +20,7 @@ import { SettingsPage } from './pages/SettingsPage';
 export const AppContent: React.FC = () => {
   const [currentTab, setCurrentTab] = useState('dashboard');
   const [activeWorkspace, setActiveWorkspace] = useState<Workspace | undefined>(undefined);
+  const [showTour, setShowTour] = useState(false);
   const queryClient = useQueryClient();
 
   const { data: health } = useQuery({
@@ -61,6 +64,16 @@ export const AppContent: React.FC = () => {
             workspaces={workspaces}
             tasks={tasks}
             activeWorkspace={activeWorkspace}
+            onNavigate={setCurrentTab}
+          />
+        );
+      case 'workspace-ide':
+        return (
+          <EngineeringWorkspacePage
+            activeWorkspace={activeWorkspace}
+            activeTask={activeTask}
+            tasks={tasks}
+            onRefresh={handleRefresh}
             onNavigate={setCurrentTab}
           />
         );
@@ -113,6 +126,7 @@ export const AppContent: React.FC = () => {
         currentTab={currentTab}
         onSelectTab={setCurrentTab}
         activeWorkspaceName={activeWorkspace?.name}
+        onOpenTour={() => setShowTour(true)}
       />
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
         <Header
@@ -120,11 +134,22 @@ export const AppContent: React.FC = () => {
           workspaces={workspaces}
           activeWorkspace={activeWorkspace}
           onSelectWorkspace={setActiveWorkspace}
+          onOpenTour={() => setShowTour(true)}
         />
         <main className="flex-1 overflow-y-auto bg-navy-950">
           {renderContent()}
         </main>
       </div>
+
+      {/* Interactive Recruiter / Developer Onboarding Tour */}
+      <OnboardingModal
+        isOpen={showTour}
+        onClose={() => setShowTour(false)}
+        onNavigate={(tab: string) => {
+          setCurrentTab(tab);
+          setShowTour(false);
+        }}
+      />
     </div>
   );
 };

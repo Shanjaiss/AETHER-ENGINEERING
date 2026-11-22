@@ -1,5 +1,5 @@
 import React from 'react';
-import { ShieldCheck, Server, Sparkles, AlertCircle } from 'lucide-react';
+import { ShieldCheck, Server, Sparkles, AlertCircle, HelpCircle } from 'lucide-react';
 import { HealthResponse, Workspace } from '../../types';
 
 interface HeaderProps {
@@ -7,6 +7,7 @@ interface HeaderProps {
   workspaces: Workspace[];
   activeWorkspace?: Workspace;
   onSelectWorkspace: (ws: Workspace) => void;
+  onOpenTour?: () => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -14,6 +15,7 @@ export const Header: React.FC<HeaderProps> = ({
   workspaces,
   activeWorkspace,
   onSelectWorkspace,
+  onOpenTour,
 }) => {
   return (
     <header className="h-14 bg-navy-900 border-b border-navy-800 px-6 flex items-center justify-between">
@@ -35,8 +37,19 @@ export const Header: React.FC<HeaderProps> = ({
         </select>
       </div>
 
-      {/* Right: Badges */}
+      {/* Right: Badges & Tour */}
       <div className="flex items-center space-x-3 text-xs font-mono">
+        {onOpenTour && (
+          <button
+            onClick={onOpenTour}
+            className="flex items-center space-x-1.5 px-2.5 py-1 rounded bg-cyan-500/10 hover:bg-cyan-500/20 border border-cyan-500/30 text-cyan-300 transition-colors shadow-sm cursor-pointer"
+            title="Launch Interactive Product Tour"
+          >
+            <HelpCircle className="w-3.5 h-3.5 text-cyan-400" />
+            <span className="font-sans font-medium">Quick Tour</span>
+          </button>
+        )}
+
         {/* Isolated Sandbox Badge */}
         <div className="flex items-center space-x-1.5 px-2.5 py-1 rounded bg-navy-950 border border-navy-700 text-slate-300">
           <ShieldCheck className="w-3.5 h-3.5 text-cyan-400" />

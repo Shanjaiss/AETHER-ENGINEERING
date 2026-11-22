@@ -12,13 +12,13 @@ from backend.app.core.security import sanitize_command, SecurityException
 from backend.app.models.task import ExecutionRun
 
 ALLOWED_TEST_EXECUTABLES = {
-    "pytest", "vitest", "npm", "python", "python3", "tsc"
+    "pytest", "vitest", "npm", "python", "python3", "tsc", "node"
 }
 
 def is_allowed_executable(cmd_name: str) -> bool:
     if cmd_name in ALLOWED_TEST_EXECUTABLES:
         return True
-    if cmd_name.startswith("python3.") or cmd_name.startswith("python2."):
+    if cmd_name.startswith("python3.") or cmd_name.startswith("python2.") or cmd_name.startswith("node"):
         return True
     return False
 
