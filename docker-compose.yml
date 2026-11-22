@@ -1,0 +1,241 @@
+# AETHER ENGINEER — Docker Compose Infrastructure Specification
+# Multi-Profile Orchestration: development, data, worker, observability, production
+# Target Environment: Apple Silicon Mac M1 (8 GB RAM)
+
+services:
+  # =========================================================================
+  # 1. CORE APPLICATION: BACKEND API
+  # =========================================================================
+  backend:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    container_name: aether-backend
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      - APP_NAME=AETHER ENGINEER
+      - APP_ENV=development
+      - DEBUG=true
+      - HOST=0.0.0.0
+      - PORT=8000
+      - DATABASE_URL=${DATABASE_URL:-sqlite:///./workspaces/aether_engineer.db}
+      - REDIS_URL=${REDIS_URL:-redis://redis:6379/0}
+      - CORS_ORIGINS=["http://localhost:5173","http://localhost:8080","http://127.0.0.1:5173"]
+      - WORKSPACE_ROOT=/app/workspaces
+    volumes:
+      - aether_workspaces:/app/workspaces
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/v1/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    deploy:
+      resources:
+        limits:
+          cpus: "1.5"
+          memory: 512M
+    networks:
+      - aether-net
+
+  # =========================================================================
+  # 2. CORE APPLICATION: FRONTEND IDE
+  # =========================================================================
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: aether-frontend
+    restart: unless-stopped
+    ports:
+      - "5173:8080"
+    depends_on:
+      backend:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "-", "http://localhost:8080/healthz"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+    deploy:
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 256M
+    networks:
+      - aether-net
+
+  # =========================================================================
+  # 3. DATA PROFILE: POSTGRESQL (Optional)
+  # =========================================================================
+  postgres:
+    profiles: ["data", "production"]
+    image: postgres:16-alpine
+    container_name: aether-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: aether_engineer
+      POSTGRES_USER: aether_user
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-aether_secure_pass_123}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U aether_user -d aether_engineer"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 384M
+    networks:
+      - aether-net
+
+  # =========================================================================
+  # 4. DATA PROFILE: REDIS (Optional)
+  # =========================================================================
+  redis:
+    profiles: ["data", "worker", "production"]
+    image: redis:7-alpine
+    container_name: aether-redis
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes", "--maxmemory", "128mb", "--maxmemory-policy", "allkeys-lru"]
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+    deploy:
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 192M
+    networks:
+      - aether-net
+
+  # =========================================================================
+  # 5. WORKER PROFILE: ASYNCHRONOUS AI WORKER (Optional)
+  # =========================================================================
+  worker:
+    profiles: ["worker", "production"]
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    container_name: aether-worker
+    restart: unless-stopped
+    entrypoint: ["python", "scripts/run_worker.py"]
+    environment:
+      - APP_ENV=production
+      - REDIS_URL=${REDIS_URL:-redis://redis:6379/0}
+      - DATABASE_URL=${DATABASE_URL:-sqlite:///./workspaces/aether_engineer.db}
+      - WORKER_CONCURRENCY=1
+    volumes:
+      - aether_workspaces:/app/workspaces
+    depends_on:
+      backend:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 512M
+    networks:
+      - aether-net
+
+  # =========================================================================
+  # 6. OBSERVABILITY PROFILE: PROMETHEUS (Optional)
+  # =========================================================================
+  prometheus:
+    profiles: ["observability"]
+    image: prom/prometheus:v2.50.0
+    container_name: aether-prometheus
+    restart: unless-stopped
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--storage.tsdb.path=/prometheus"
+      - "--storage.tsdb.retention.time=7d"
+    deploy:
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 256M
+    networks:
+      - aether-net
+
+  # =========================================================================
+  # 7. OBSERVABILITY PROFILE: GRAFANA (Optional)
+  # =========================================================================
+  grafana:
+    profiles: ["observability"]
+    image: grafana/grafana:10.3.0
+    container_name: aether-grafana
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_PASSWORD:-admin123}
+      - GF_USERS_ALLOW_SIGN_UP=false
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./monitoring/grafana_dashboard.json:/etc/grafana/provisioning/dashboards/aether_dashboard.json:ro
+    deploy:
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 256M
+    networks:
+      - aether-net
+
+  # =========================================================================
+  # 8. PRODUCTION PROFILE: NGINX REVERSE PROXY (Optional)
+  # =========================================================================
+  reverse-proxy:
+    profiles: ["production"]
+    image: nginx:alpine
+    container_name: aether-proxy
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      backend:
+        condition: service_healthy
+      frontend:
+        condition: service_healthy
+    deploy:
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 128M
+    networks:
+      - aether-net
+
+volumes:
+  aether_workspaces:
+  postgres_data:
+  redis_data:
+  prometheus_data:
+  grafana_data:
+
+networks:
+  aether-net:
+    driver: bridge
+

@@ -15,7 +15,7 @@ Returns the operational health of the application, database connectivity, and co
 **Response (200 OK):**
 ```json
 {
-  "status": "ok",
+  "status": "healthy",
   "version": "0.1.0",
   "environment": "development",
   "database_connected": true,
@@ -23,14 +23,96 @@ Returns the operational health of the application, database connectivity, and co
   "llm_provider": "gemini",
   "details": {
     "target_platform": "Apple Silicon Mac M1 (8 GB RAM)",
-    "database_engine": "sqlite"
+    "database_dialect": "sqlite",
+    "database_latency_ms": 0.42,
+    "queue_depth": 0,
+    "worker_status": "READY"
   }
 }
 ```
 
 ---
 
-## 2. Workspaces (`/api/v1/workspaces`)
+## 2. User Authentication & Authorization (`/api/v1/auth`)
+
+### `POST /api/v1/auth/register`
+Registers a new user account with PBKDF2 password hashing and tenant isolation.
+
+**Request Body:**
+```json
+{
+  "email": "developer@company.com",
+  "password": "SecurePassword123!",
+  "full_name": "Senior Software Engineer",
+  "role": "DEVELOPER",
+  "tenant_id": "tenant-corp"
+}
+```
+
+### `POST /api/v1/auth/login`
+Authenticates credentials and returns signed HMAC-SHA256 access and refresh JWTs.
+
+**Response (200 OK):**
+```json
+{
+  "access_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+  "refresh_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+  "token_type": "bearer",
+  "expires_in": 3600,
+  "user": {
+    "id": "usr-123",
+    "email": "developer@company.com",
+    "role": "DEVELOPER",
+    "tenant_id": "tenant-corp"
+  }
+}
+```
+
+### `GET /api/v1/auth/me`
+Returns current user profile (requires `Authorization: Bearer <token>`).
+
+### `POST /api/v1/auth/logout`
+Revokes session and writes immutable security audit log.
+
+---
+
+## 3. Asynchronous Task Queue (`/api/v1/queue`)
+
+### `POST /api/v1/queue/enqueue`
+Submits an engineering task for background asynchronous execution. Enforces idempotency keys.
+
+**Request Body:**
+```json
+{
+  "task_id": "task-abcde",
+  "task_type": "EXECUTE_LIFECYCLE",
+  "idempotency_key": "idemp-unique-token-123"
+}
+```
+
+### `GET /api/v1/queue/status/{job_id}`
+Returns job status (`QUEUED`, `PROCESSING`, `COMPLETED`, `FAILED`), progress percentage, and retry count.
+
+### `GET /api/v1/queue/stats`
+Returns queue depth and active worker processing metrics.
+
+---
+
+## 4. Real-Time Server-Sent Events (`/api/v1/events`)
+
+### `GET /api/v1/events/stream/{task_id}`
+Connects an HTTP SSE stream yielding real-time agent lifecycle events (`planning_started`, `patch_applied`, `verification_running`, `tests_passed`, `completed`).
+
+---
+
+## 5. Prometheus Observability Metrics (`/api/v1/metrics`)
+
+### `GET /api/v1/metrics`
+Exposes Prometheus exposition text format with process resident memory (`aether_process_resident_memory_bytes`), active tasks, HTTP request throughput, token consumption, and blocked security attacks.
+
+---
+
+## 6. Workspaces (`/api/v1/workspaces`)
 
 ### `GET /api/v1/workspaces`
 Lists all registered developer workspaces.

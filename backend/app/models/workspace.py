@@ -8,6 +8,8 @@ class Workspace(Base, TimestampMixin):
     __tablename__ = "workspaces"
 
     id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    tenant_id = Column(String, index=True, default="default-tenant", nullable=False)
+    owner_id = Column(String, nullable=True, index=True)
     name = Column(String, nullable=False)
     path = Column(String, nullable=False, unique=True)
     is_active = Column(Boolean, default=True)

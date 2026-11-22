@@ -33,6 +33,8 @@ class Task(Base, TimestampMixin):
     __tablename__ = "tasks"
 
     id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    tenant_id = Column(String, index=True, default="default-tenant", nullable=False)
+    created_by_user_id = Column(String, nullable=True, index=True)
     workspace_id = Column(String, ForeignKey("workspaces.id"), nullable=False)
     title = Column(String, nullable=False)
     description = Column(Text, nullable=False)

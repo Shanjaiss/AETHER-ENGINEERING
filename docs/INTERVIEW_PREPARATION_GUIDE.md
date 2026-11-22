@@ -283,3 +283,128 @@
 **Answer:**
 > *"In AI software engineering, generation is easy; verification is hard. Anyone can prompt an LLM to generate code, but without isolated sandboxing, topological planning, and deterministic test verification, generative AI cannot be trusted in production. True agentic engineering begins when the AI is held accountable to the same objective test suites that govern human engineers."*
 
+---
+
+### Category 6: Infrastructure, DevOps & Cloud Architecture (Q51–Q80)
+
+#### Q51: Why did you select Docker for containerization, and how is it structured?
+**Answer:**
+> *"We chose Docker to guarantee reproducible runtime environments across local development and cloud production. Both frontend and backend utilize multi-stage builds. The backend container (`backend/Dockerfile`) uses `python:3.12-slim-bookworm` with wheels cached in the builder stage, and runs under an unprivileged `aether` system user (uid: 10001). The frontend container compiles Vite static assets using Node 22 and serves them through `nginxinc/nginx-unprivileged:alpine-slim`, keeping production images under 25 MB."*
+
+#### Q52: What is the fundamental difference between containers and virtual machines for code execution?
+**Answer:**
+> *"Containers share the host operating system's kernel via cgroups and Linux namespaces (pid, net, mnt, ipc). Virtual machines (VMs), by contrast, run an independent guest operating system atop a hardware hypervisor (KVM, Nitro, Xen) with dedicated virtualized hardware. While containers offer near-instant startup (< 200ms) and minimal overhead, they share the host kernel. A kernel exploit (e.g. Dirty COW or container-escape CVE) in a container compromises the host, whereas a VM boundary provides hardware-isolated memory and CPU virtualization."*
+
+#### Q53: Why are ordinary containers insufficient for executing untrusted repository code?
+**Answer:**
+> *"Ordinary containers share the host kernel. If untrusted code executed by an agent exploits a kernel vulnerability, mounts host volumes, or attempts privilege escalation, it can escape the container and compromise the host infrastructure. Furthermore, standard containers often have access to default network bridges. For true multi-tenant execution of untrusted code, production architectures must utilize hardened microVMs (such as AWS Firecracker) or user-space kernel sandboxes (Google gVisor / `runsc`), which intercept syscalls and enforce strict virtualization boundaries."*
+
+#### Q54: Why is PostgreSQL suitable for persistent production data, and how is it abstracted from SQLite?
+**Answer:**
+> *"PostgreSQL provides robust ACID transactions, multi-version concurrency control (MVCC), foreign key constraints, connection pooling, and multi-AZ replication for high availability. In AETHER ENGINEER, we abstracted the database layer using SQLAlchemy 2.0. In local development on Mac M1, the system defaults to embedded SQLite in WAL mode with zero background RAM footprint. In production, changing `DATABASE_URL` activates PostgreSQL connection pooling (`pool_size=10, max_overflow=20, pool_pre_ping=True`) with zero code alterations."*
+
+#### Q55: Why is Redis useful for asynchronous tasks and caching in this architecture?
+**Answer:**
+> *"Redis provides in-memory sub-millisecond data structures. In our architecture, Redis serves two distinct purposes: 1) As an atomic task queue broker for long-running AI planning, coding, and test verification tasks, and 2) As a tenant-scoped cache for repository AST symbols, framework detection, and file trees. When Redis is unavailable locally, our `TaskQueueManager` and `CacheManager` gracefully fall back to thread-safe in-memory implementations without crashing."*
+
+#### Q56: How do background workers recover from unexpected node crashes or evictions?
+**Answer:**
+> *"Task state is checkpointed in the relational database prior to every state transition. Jobs in the queue carry unique IDs and track heartbeats. If a worker process terminates abruptly, the task remains marked as `PROCESSING`. Upon worker restart or dead-letter sweep, jobs with expired heartbeats (> 120s) are detected. Workers inspect the task's last recorded checkpoint and re-enqueue or fail safely with diagnostic tracebacks. Privileged human approvals (`GateType.PLAN`, `GateType.DIFF`) are never re-executed automatically."*
+
+#### Q57: How is duplicate task execution prevented in an asynchronous environment?
+**Answer:**
+> *"We enforce client-supplied `idempotency_key` deduplication in `TaskQueueManager`. When an enqueue request arrives, the queue checks its idempotency registry. If a job with that key is currently queued or processing, the queue returns the existing `job_id` and status rather than spawning duplicate worker execution. At the database level, unique constraints prevent duplicate active tasks for the same workspace."*
+
+#### Q58: How do API services scale horizontally behind a load balancer?
+**Answer:**
+> *"The FastAPI backend application is stateless. User authentication utilizes signed JWT tokens, and persistent state resides in PostgreSQL and Redis. Multiple replicas of the backend container can run behind an Application Load Balancer (ALB) or Nginx reverse proxy. Health checks (`/api/v1/health`) ensure traffic is routed only to ready instances. Replicas can scale from 2 to 20+ pods automatically based on CPU or request rate thresholds."*
+
+#### Q59: How do AI workers scale independently from API services?
+**Answer:**
+> *"AI workers are decoupled into independent consumer processes (`scripts/run_worker.py`). While API servers scale on HTTP request volume, AI workers scale on queue depth using tools like KEDA (Kubernetes Event-driven Autoscaling). If developers submit a surge of 500 tasks, the API servers respond in milliseconds with HTTP 202 Accepted, while the worker pool scales out horizontally to consume the backlog without degrading API responsiveness."*
+
+#### Q60: How are database connections managed across multiple application instances?
+**Answer:**
+> *"Each application instance configures an SQLAlchemy connection pool with `pool_size=10, max_overflow=20, pool_timeout=30, pool_recycle=1800`. Connections are validated before checkout using `pool_pre_ping=True` to prune stale TCP sockets. In large production environments with dozens of replicas, we place AWS RDS Proxy or PgBouncer in front of PostgreSQL to pool thousands of client connections into a manageable database connection pool."*
+
+#### Q61: How is tenant data isolation enforced across the application?
+**Answer:**
+> *"Every workspace, repository, and engineering task is tagged with a `tenant_id`. Every authenticated JWT contains the caller's `tenant_id`. Our dependency injection middleware enforces `verify_workspace_access()`, which asserts that `workspace.tenant_id == current_user.tenant_id`. Cross-tenant queries are blocked with HTTP 403 Forbidden. Similarly, cache keys in Redis are prefixed by tenant (`tenant:{tenant_id}:repo:{repo_id}:...`), preventing cross-tenant cache contamination."*
+
+#### Q62: How does rate limiting work at both the proxy and application levels?
+**Answer:**
+> *"At the reverse proxy level, Nginx enforces IP-based rate limiting via `limit_req_zone $binary_remote_addr zone=api_limit:10m rate=30r/s` with a burst buffer of 50. At the application layer, per-user token-bucket rate limiters throttle API keys that exceed their tier limits, protecting downstream model providers from token exhaustion."*
+
+#### Q63: How are model inference costs and token budgets controlled?
+**Answer:**
+> *"Our `CostController` maintains real-time token pricing matrices across providers (Gemini, Claude, GPT-4o). Every LLM invocation tracks prompt tokens and completion tokens. The controller enforces a `DEFAULT_PER_TASK_BUDGET_DOLLARS = $1.00` and a 50,000 token limit per task. If an iterative repair loop exceeds this budget, execution halts immediately with `InferenceBudgetExceededError`, preventing runaway cloud bills."*
+
+#### Q64: How do Server-Sent Events (SSE) streaming connections recover from network drops?
+**Answer:**
+> *"Our `EventBroadcaster` tags every event with a monotonically increasing `event_id` and event type. Nginx is configured with `proxy_buffering off` to allow immediate chunked streaming. If a client disconnects, the browser's `EventSource` automatically reconnects and sends the `Last-Event-ID` header, enabling the server to resume streaming from the last acknowledged event."*
+
+#### Q65: How does distributed observability work in AETHER ENGINEER?
+**Answer:**
+> *"We implement a Prometheus exposition endpoint (`/api/v1/metrics`) that collects system metrics (resident memory RSS via `getrusage`), application metrics (HTTP request rate, duration histogram, active tasks, error rates), AI metrics (cumulative tokens and costs), and security metrics (blocked traversal and injection attempts). Prometheus scrapes this endpoint every 15s, and Grafana visualizes latency distributions and queue depth."*
+
+#### Q66: How are CI/CD deployment pipelines secured against supply-chain attacks?
+**Answer:**
+> *"Our GitHub Actions workflow (`.github/workflows/ci.yml`) enforces least-privilege permissions (`permissions: contents: read`). Action versions are pinned to trusted major tags (`actions/checkout@v4`). Dependencies are installed using lockfiles (`npm ci`). Secret scanning and security regression tests run automatically on every push, and deployment steps are strictly decoupled from pull request workflows."*
+
+#### Q67: How do task queues handle sudden burst overload and backpressure?
+**Answer:**
+> *"When task arrival exceeds worker consumption capacity, the queue buffers jobs in Redis or memory, returning HTTP 202 Accepted with a `queue_depth` indicator. If queue depth exceeds configured thresholds (e.g. 1,000 jobs), the API rejects new non-critical tasks with HTTP 429 Too Many Requests and a `Retry-After` header, preventing memory exhaustion on the host."*
+
+#### Q68: How does the platform handle model provider rate limits and transient outages?
+**Answer:**
+> *"The Model Gateway wraps provider calls with exponential backoff and jitter (retrying up to 3 times on HTTP 429 or 503). If a provider experiences sustained outage, the gateway reports the failure transparently rather than hanging. Optional fallback between explicitly authorized providers can be configured, but silent switching to more expensive models without authorization is strictly prohibited."*
+
+#### Q69: How are database backups tested and restored safely?
+**Answer:**
+> *"Restorations are never performed directly on production databases. Our SOP (`docs/DISASTER_RECOVERY.md`) mandates restoring database dumps into an isolated disposable test database (`aether_recovery_test`). Automated verification scripts check row counts, foreign key constraints, and run `alembic upgrade head` before traffic is redirected."*
+
+#### Q70: How could AETHER ENGINEER scale from a single developer to 10,000 concurrent users?
+**Answer:**
+> *"By transitioning from Tier 1 (Single Node) to Tier 3 (Enterprise Cloud): 1) Deploy API services on Amazon EKS across 12+ horizontally autoscaled pods, 2) Use KEDA to autoscale worker pods on Redis queue depth, 3) Migrate database to a Multi-AZ Amazon Aurora PostgreSQL cluster with write-primary and auto-scaling read replicas, 4) Deploy AWS Firecracker microVMs for hardware-isolated untrusted code execution, 5) Cache AST indexes in an ElastiCache Redis cluster, and 6) Deliver static frontend assets globally via CloudFront CDN."*
+
+#### Q71: How do multi-stage Docker builds reduce attack surfaces and image sizes?
+**Answer:**
+> *"Multi-stage builds separate the build environment from the runtime environment. In our backend Dockerfile, the builder stage installs build tools (`build-essential`, compilers) and compiles Python wheels. The runner stage copies only the compiled `site-packages` into a fresh `python:3.12-slim` image without compilers or build artifacts, shrinking the image by over 60% and eliminating vulnerable build tools from production containers."*
+
+#### Q72: Why is running containers as non-root critical for application security?
+**Answer:**
+> *"By default, Docker containers run as root (`uid: 0`), which maps directly to host root if user namespaces are not configured. If a container breakout or command injection vulnerability occurs, the attacker gains root privileges on the host. In our Dockerfiles, we explicitly create and switch to unprivileged users (`USER aether` on backend, `USER nginx` on frontend), ensuring that even in the event of an application compromise, root access cannot be acquired."*
+
+#### Q73: Why are Docker Compose profiles essential for development on Apple Silicon Mac M1 (8 GB RAM)?
+**Answer:**
+> *"Running a full enterprise stack simultaneously (Postgres, Redis, Backend, Frontend, Worker, Prometheus, Grafana, Nginx) consumes 3–5 GB of RAM, causing severe memory pressure on an 8 GB unified memory Mac. Our `docker-compose.yml` defines profiles (`development`, `data`, `worker`, `observability`). Developers can run just the lightweight frontend and backend with SQLite (`--profile development`), spinning up data or monitoring services only when needed."*
+
+#### Q74: How was horizontal privilege escalation prevented across workspaces?
+**Answer:**
+> *"Horizontal privilege escalation occurs when User A accesses or modifies User B's resources. In AETHER ENGINEER, `verify_workspace_access()` inspects the tenant and ownership tags on every workspace and task. If a user from `tenant-corp` attempts to access a workspace belonging to `tenant-competitor`, the request is immediately rejected with HTTP 403 Forbidden and logged as an immutable security audit event."*
+
+#### Q75: How does PBKDF2 password hashing protect against rainbow table attacks?
+**Answer:**
+> *"PBKDF2 applies 100,000 iterations of HMAC-SHA256 with a cryptographically random 16-byte salt per user. The unique salt ensures identical passwords produce completely different hash strings, neutralizing pre-computed rainbow table attacks. The 100,000 iteration count introduces computational cost that makes brute-force dictionary attacks infeasible."*
+
+#### Q76: How does JWT claims validation defend against token tampering and replay?
+**Answer:**
+> *"Our JWT parser validates four distinct layers: 1) HMAC-SHA256 signature verification with constant-time comparison, 2) Expiration (`exp`) verification against UTC timestamps, 3) Issuer (`iss: 'aether-engineer'`) validation, and 4) Audience (`aud: 'aether-api'`) validation. Tampering with any payload field invalidates the signature, and expired tokens are rejected immediately."*
+
+#### Q77: How does tenant-scoped caching prevent cache poisoning?
+**Answer:**
+> *"Cache keys are structured as `tenant:{tenant_id}:repo:{repo_id}:{key}`. Because every lookup includes the caller's authenticated `tenant_id`, one tenant can never read or overwrite another tenant's cached file trees or AST symbol indexes. Furthermore, when files are patched or merged, `cache_manager.invalidate_repo()` purges all keys for that repository, preventing stale context reuse."*
+
+#### Q78: How does graceful shutdown handle in-flight tasks and database transactions?
+**Answer:**
+> *"Our worker and FastAPI applications register `SIGINT` and `SIGTERM` signal handlers. When a shutdown signal is received, the listener stops accepting new tasks and finishes processing the active task job. Database connections are flushed and closed gracefully, and SQLite writes its write-ahead log to the main database file before process exit."*
+
+#### Q79: What is the difference between RTO and RPO in AETHER ENGINEER disaster recovery?
+**Answer:**
+> *"Recovery Time Objective (RTO) is the maximum acceptable duration of system downtime after an outage (e.g. target RTO < 30 minutes to restore a database replica). Recovery Point Objective (RPO) is the maximum acceptable age of data lost due to an incident (e.g. target RPO < 1 hour of task logs). We document concrete backup strategies for both metrics in `docs/DISASTER_RECOVERY.md`."*
+
+#### Q80: How does AETHER ENGINEER separate the application control plane from untrusted code execution?
+**Answer:**
+> *"The control plane (FastAPI, database, auth) handles user interactions and planning. Untrusted repository code (unit tests, scripts) is never executed within the primary application process. It executes inside dedicated subprocess sandboxes with stripped environments, strict argument allowlists, and execution timeouts. In cloud production, this boundary is enforced via isolated microVMs, ensuring untrusted code has zero access to host credentials or internal network services."*
+
+

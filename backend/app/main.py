@@ -1,3 +1,4 @@
+import time
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request, status
 from fastapi.middleware.cors import CORSMiddleware
@@ -7,6 +8,7 @@ from backend.app.core.config import settings
 from backend.app.core.logging import logger
 from backend.app.core.database import init_db
 from backend.app.core.security import SecurityException
+from backend.app.core.metrics import metrics
 from backend.app.api.v1.api import api_router
 
 @asynccontextmanager
@@ -35,10 +37,26 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Metrics & Latency Middleware
+@app.middleware("http")
+async def metrics_middleware(request: Request, call_next):
+    start_time = time.perf_counter()
+    response = await call_next(request)
+    duration = time.perf_counter() - start_time
+    path = request.url.path
+    # Normalize paths to prevent metric explosion
+    if path.startswith("/api/v1/tasks/"):
+        path = "/api/v1/tasks/{id}"
+    elif path.startswith("/api/v1/workspaces/"):
+        path = "/api/v1/workspaces/{id}"
+    metrics.record_request(request.method, path, response.status_code, duration)
+    return response
+
 # Exception Handlers
 @app.exception_handler(SecurityException)
 async def security_exception_handler(request: Request, exc: SecurityException):
     logger.warning(f"Security violation blocked: {exc.detail} on {request.url}")
+    metrics.record_security_violation("path_traversal_or_command_blocked")
     return JSONResponse(
         status_code=exc.status_code,
         content={"error": "SecurityViolation", "detail": exc.detail}

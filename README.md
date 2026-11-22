@@ -2,9 +2,10 @@
 ### *Autonomous AI Software Engineering Platform — "From Requirement to Verified Code"*
 
 [![License](https://img.shields.io/badge/License-MIT-blue?style=flat-square)](LICENSE)
-[![Tests](https://img.shields.io/badge/Backend%20Tests-64%2F64%20Passed-10B981?style=flat-square)](backend/tests)
+[![Tests](https://img.shields.io/badge/Backend%20Tests-74%2F74%20Passed-10B981?style=flat-square)](backend/tests)
 [![Frontend](https://img.shields.io/badge/Frontend%20Tests-2%2F2%20Passed-10B981?style=flat-square)](frontend)
 [![Benchmarks](https://img.shields.io/badge/Benchmarks-50%2F50%20Resolved%20(100%25)-06B6D4?style=flat-square)](docs/BENCHMARK_SUMMARY.md)
+[![DevOps](https://img.shields.io/badge/DevOps-Docker%20Compose%20Profiles-F59E0B?style=flat-square)](docs/INFRASTRUCTURE.md)
 [![Security](https://img.shields.io/badge/Adversarial%20Security-12%2F12%20Prevented%20(100%25)-8B5CF6?style=flat-square)](docs/BENCHMARK_SUMMARY.md)
 [![Platform Target](https://img.shields.io/badge/Target-Apple%20Silicon%20M1%20(8GB)-EC4899?style=flat-square)](#hardware-optimization)
 
@@ -186,17 +187,43 @@ cd ..
 
 ---
 
-## 8. Documentation Index
+## 8. Docker & Infrastructure Profiles
 
+AETHER ENGINEER provides production multi-stage containerization with five decoupled Compose profiles to prevent memory thrashing on 8 GB development machines:
+
+```bash
+# 1. Minimal Development (Frontend + Backend with zero-daemon SQLite)
+docker compose --profile development up -d
+
+# 2. Data Services (PostgreSQL 16 + Redis 7)
+docker compose --profile data up -d
+
+# 3. Asynchronous Worker Processing
+docker compose --profile worker up -d
+
+# 4. Observability (Prometheus + Grafana on port 3000)
+docker compose --profile observability up -d
+
+# 5. Full Production Stack (with Nginx reverse proxy on port 80)
+docker compose --profile production up -d
+```
+
+---
+
+## 9. Documentation Index
+
+- [Production Infrastructure & DevOps Architecture](file:///Users/shanjaisenthil/Documents/AETHER%20ENGINEER/docs/INFRASTRUCTURE.md)
+- [3-Tier Cloud Deployment Architecture](file:///Users/shanjaisenthil/Documents/AETHER%20ENGINEER/docs/CLOUD_DEPLOYMENT.md)
+- [Disaster Recovery & Incident Response Runbook](file:///Users/shanjaisenthil/Documents/AETHER%20ENGINEER/docs/DISASTER_RECOVERY.md)
 - [System Architecture & 10 ADRs](file:///Users/shanjaisenthil/Documents/AETHER%20ENGINEER/docs/ARCHITECTURE.md)
 - [Complete OpenAPI Reference](file:///Users/shanjaisenthil/Documents/AETHER%20ENGINEER/docs/API_REFERENCE.md)
 - [Benchmark Results & Research Report](file:///Users/shanjaisenthil/Documents/AETHER%20ENGINEER/docs/BENCHMARK_SUMMARY.md)
 - [Real-World Engineering Case Studies](file:///Users/shanjaisenthil/Documents/AETHER%20ENGINEER/docs/CASE_STUDIES.md)
-- [Technical Interview Preparation Guide](file:///Users/shanjaisenthil/Documents/AETHER%20ENGINEER/docs/INTERVIEW_PREPARATION_GUIDE.md)
+- [Technical Interview Preparation Guide (80 Questions)](file:///Users/shanjaisenthil/Documents/AETHER%20ENGINEER/docs/INTERVIEW_PREPARATION_GUIDE.md)
 - [Career Materials & ATS Resume Bullets](file:///Users/shanjaisenthil/Documents/AETHER%20ENGINEER/docs/CAREER_AND_RESUME_GUIDE.md)
 
 ---
 
-## 9. License
+## 10. License
 
 This project is licensed under the MIT License — see the [LICENSE](file:///Users/shanjaisenthil/Documents/AETHER%20ENGINEER/LICENSE) file for details.
